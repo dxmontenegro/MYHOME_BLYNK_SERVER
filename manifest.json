@@ -1,6 +1,6 @@
 {
   "name": "DMX-V1 - BLINK_SERVER",
-  "short_name": "Casa",
+  "short_name": "V1_Blynk_Server",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
