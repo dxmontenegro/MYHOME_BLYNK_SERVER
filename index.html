@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<title>Casa Inteligente</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #ECEFF4;
+  color: #2E3440;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* HEADER */
+.header {
+  text-align: center;
+  padding: 10px;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+/* STATUS */
+.esp {
+  text-align: center;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+/* GRID */
+.grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 12px;
+  overflow-y: auto;
+}
+
+/* CARD */
+.card {
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #FFFFFF;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+}
+
+/* TIPOS */
+.luz { border-left: 5px solid #4CC9F0; }
+.seguranca { border-left: 5px solid #F72585; }
+.sistema { border-left: 5px solid #4895EF; }
+
+/* ATIVO */
+.card.on {
+  background: #4CC9F0;
+  color: white;
+  transform: scale(0.97);
+}
+
+/* SIRENE */
+.seguranca.on {
+  background: #E63946;
+}
+
+/* ICON */
+.icon {
+  font-size: 26px;
+  width: 30px;
+  text-align: center;
+}
+
+/* TEXT */
+.nome {
+  flex: 1;
+  font-size: 15px;
+}
+
+/* FOOTER */
+.footer {
+  height: 50px;
+  background: #FFFFFF;
+  border-top: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.footer i {
+  color: #4CC9F0;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">🏠 Casa Inteligente</div>
+<div class="esp" id="espStatus">ESP: Verificando...</div>
+
+<div class="grid" id="grid"></div>
+
+<div class="footer">
+  <i class="fa-solid fa-code"></i>
+  Powered by <strong>D.S.Montenegro</strong> - DMX
+</div>
+
+<script>
+const TOKEN = "pKHK2qI2PW0xVP4ei3cuNkiQyDCEKxjS";
+
+const dispositivos = [
+  {nome:"Corredor", pino:"V0", icon:"fa-lightbulb", tipo:"luz"},
+  {nome:"Escada", pino:"V1", icon:"fa-stairs", tipo:"luz"},
+  {nome:"Banheiro", pino:"V2", icon:"fa-shower", tipo:"luz"},
+  {nome:"Quarto", pino:"V3", icon:"fa-bed", tipo:"luz"},
+  {nome:"Refletor", pino:"V4", icon:"fa-sun", tipo:"luz"},
+  {nome:"Sirene", pino:"V5", icon:"fa-bell", tipo:"seguranca"},
+  {nome:"Tudo", pino:"V6", icon:"fa-bolt", tipo:"sistema"},
+  {nome:"LED ESP", pino:"V7", icon:"fa-microchip", tipo:"sistema"},
+  {nome:"Auto", pino:"V8", icon:"fa-robot", tipo:"sistema"}
+];
+
+const grid = document.getElementById("grid");
+
+dispositivos.forEach((d, i) => {
+  grid.innerHTML += `
+    <div class="card ${d.tipo}" id="card${i}" onclick="toggle(${i})">
+      <div class="icon"><i class="fa-solid ${d.icon}"></i></div>
+      <div class="nome">${d.nome}</div>
+    </div>
+  `;
+});
+
+/* TOQUE */
+function toggle(i){
+  let d = dispositivos[i];
+  let card = document.getElementById(`card${i}`);
+
+  // 🚨 SIRENE TEMPORIZADA
+  if(d.pino === "V5"){
+    atualizarVisual(i, 1);
+
+    fetch(`https://blynk.cloud/external/api/update?token=${TOKEN}&V5=1`);
+
+    if(navigator.vibrate) navigator.vibrate(100);
+
+    setTimeout(() => {
+      fetch(`https://blynk.cloud/external/api/update?token=${TOKEN}&V5=0`);
+      atualizarVisual(i, 0);
+    }, 2000);
+
+    return;
+  }
+
+  let ligado = card.classList.contains("on") ? 0 : 1;
+
+  atualizarVisual(i, ligado);
+
+  if(navigator.vibrate) navigator.vibrate(50);
+
+  fetch(`https://blynk.cloud/external/api/update?token=${TOKEN}&${d.pino}=${ligado}`);
+}
+
+/* SINCRONIZA */
+function atualizar(){
+  dispositivos.forEach((d, i) => {
+    fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&${d.pino}`)
+      .then(r=>r.text())
+      .then(val=>{
+        atualizarVisual(i, val == "1");
+      });
+  });
+}
+
+function atualizarVisual(i, ligado){
+  let card = document.getElementById(`card${i}`);
+  ligado ? card.classList.add("on") : card.classList.remove("on");
+}
+
+/* STATUS ESP */
+let falhas = 0;
+
+function verificarESP(){
+  fetch(`https://blynk.cloud/external/api/get?token=${TOKEN}&V0`)
+    .then(r=>{
+      if(!r.ok) throw new Error();
+      return r.text();
+    })
+    .then(()=>{
+      falhas = 0;
+      document.getElementById("espStatus").innerText = "ESP: ONLINE 🟢";
+    })
+    .catch(()=>{
+      falhas++;
+      document.getElementById("espStatus").innerText =
+        falhas < 3 ? "ESP: INSTÁVEL 🟡" : "ESP: OFFLINE 🔴";
+    });
+}
+
+setInterval(atualizar, 2000);
+setInterval(verificarESP, 4000);
+
+atualizar();
+verificarESP();
+
+// PWA
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('service-worker.js');
+}
+</script>
+
+</body>
+</html>
